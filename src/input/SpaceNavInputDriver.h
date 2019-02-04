@@ -30,19 +30,19 @@
 
 class SpaceNavInputDriver : public InputDriver
 {
-    Q_OBJECT
+  Q_OBJECT
 
 public:
-    SpaceNavInputDriver();
-    ~SpaceNavInputDriver();
-    void run() override;
-    bool open() override;
-    void close() override;
-    void setDominantAxisOnly(bool var);
+  SpaceNavInputDriver();
+  ~SpaceNavInputDriver();
+  void run() override;
+  bool open() override;
+  void close() override;
+  void setDominantAxisOnly(bool var);
 
-    const std::string & get_name() const override;
+  const std::string &get_name() const override;
 
 private:
-    bool spnav_input();
-    bool dominantAxisOnly{true};
+  bool spnav_input();
+  bool dominantAxisOnly{true};
 };
