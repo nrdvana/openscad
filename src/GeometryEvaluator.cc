@@ -956,6 +956,81 @@ Response GeometryEvaluator::visit(State &state, const RotateExtrudeNode &node)
 	return Response::ContinueTraversal;
 }
 
+void diag(const AbstractNode &node, int indent) {
+	printf("%*s node %d\n", indent, "", node.index());
+	std::cerr << node;
+	printf("%*s children = %d\n", indent, "", node.children.size());
+	for (const AbstractNode *chnode : node.children) {
+		diag(*chnode, indent+2);
+	}
+}
+
+bool GeometryEvaluator::collect2DPolygonsIn3D(const AbstractNode *node, std::vector<Polygon2DIn3D> *result)
+{
+	// Find the matrix.
+	// Recursively descend the nodes until it has more than 1 child, multiplying the matrix along the way
+	const TransformNode *t= NULL, *begin_2d= NULL;
+	Transform3d mat;
+	while (1) {
+		if ((t= dynamic_cast<const TransformNode*>(node))) {
+			begin_2d= t;
+			mat= mat * t->matrix;
+		}
+		if (node->children.size() == 1)
+			node= node->children[0];
+		else
+			break;
+	}
+	// If there wasn't a transform node, we can't extrude
+	if (!begin_2d) {
+		PRINTB("Error: extrude_for must contain at least one transform (with no siblings) before any geometry specification%s", "");
+		return false;
+	}
+	// Find the 2D polygon of the children of the final transform node.
+	Polygon2d *poly= applyToChildren2D(*begin_2d, OpenSCADOperator::UNION);
+	if (!poly) {
+		PRINTB("Error: no 2D geometry found under %s within extrude_for", begin_2d->name().c_str());
+		return false;
+	}
+	// make sure no point on this polygon crosses the previous plane
+	
+	// make sure no point on the previous polygon crosses this plane
+	
+	// Add polygon and matrix to the list
+	result->push_back(Polygon2DIn3D(poly, mat));
+	return true;
+}
+
+shared_ptr<const Geometry> GeometryEvaluator::extrudePolygonSequence(const ExtrudeForNode &node, const std::vector<Polygon2DIn3D> &slices)
+{
+	(void) node;
+	(void) slices;
+	return nullptr;
+}
+
+Response GeometryEvaluator::visit(State &state, const ExtrudeForNode &node)
+{
+	if (state.isPrefix() && isSmartCached(node)) return Response::PruneTraversal;
+	if (state.isPostfix()) {
+		shared_ptr<const Geometry> geom(nullptr);
+		if (!isSmartCached(node)) {
+			diag(node, 0);
+			std::vector<Polygon2DIn3D> slices;
+			bool success= true;
+			for (auto chnode= node.children.begin(); chnode < node.children.end(); ++chnode)
+				success = success && collect2DPolygonsIn3D(*chnode, &slices);
+			if (success)
+				geom= extrudePolygonSequence(node, slices);
+		}
+		else {
+			geom = smartCacheGet(node, false);
+		}
+		if (geom) addToParent(state, node, geom);
+		node.progress_report();
+	}
+	return Response::ContinueTraversal;
+}
+
 /*!
 	FIXME: Not in use
 */

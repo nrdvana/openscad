@@ -46,6 +46,7 @@ public: // types
 		FOR,
 		LET,
 		INT_FOR,
+		EXTR_FOR,
 		IF
     };
 public: // methods
@@ -111,7 +112,14 @@ void ControlModule::for_eval(AbstractNode &node, const ModuleInstantiation &inst
 		}
 		
 		std::vector<AbstractNode *> instantiatednodes = inst.instantiateChildren(&c);
-		node.children.insert(node.children.end(), instantiatednodes.begin(), instantiatednodes.end());
+		if (instantiatednodes.size() > 1 && dynamic_cast<ExtrudeForNode*>(&node)) {
+			GroupNode* gr = new GroupNode(&inst);
+			node.children.insert(node.children.end(), gr);
+			gr->children.insert(gr->children.end(), instantiatednodes.begin(), instantiatednodes.end());
+		}
+		else {
+			node.children.insert(node.children.end(), instantiatednodes.begin(), instantiatednodes.end());
+		}
 	}
 }
 
@@ -318,6 +326,11 @@ AbstractNode *ControlModule::instantiate(const Context* ctx, const ModuleInstant
 		for_eval(*node, *inst, 0, evalctx, evalctx);
 		break;
 
+	case Type::EXTR_FOR:
+		node = new ExtrudeForNode(inst);
+		for_eval(*node, *inst, 0, evalctx, evalctx);
+		break;
+
 	case Type::IF: {
 		node = new GroupNode(inst);
 		const IfElseModuleInstantiation *ifelse = dynamic_cast<const IfElseModuleInstantiation*>(inst);
@@ -347,5 +360,6 @@ void register_builtin_control()
 	Builtins::init("for", new ControlModule(ControlModule::Type::FOR));
 	Builtins::init("let", new ControlModule(ControlModule::Type::LET));
 	Builtins::init("intersection_for", new ControlModule(ControlModule::Type::INT_FOR));
+	Builtins::init("extrude_for", new ControlModule(ControlModule::Type::EXTR_FOR));
 	Builtins::init("if", new ControlModule(ControlModule::Type::IF));
 }

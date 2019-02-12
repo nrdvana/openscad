@@ -49,6 +49,11 @@ std::string AbstractNode::toString() const
 	return this->name() + "()";
 }
 
+std::string ExtrudeForNode::name() const
+{
+	return "extrude_for";
+}
+
 std::string GroupNode::name() const
 {
 	return "group";
