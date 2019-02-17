@@ -86,6 +86,14 @@ public:
 	std::string name() const override;
 };
 
+class ExtrusionShapeNode : public AbstractPolyNode
+{
+public:
+	VISITABLE();
+	ExtrusionShapeNode(const ModuleInstantiation *mi) : AbstractPolyNode(mi) { }
+	std::string name() const override;
+};
+
 /*!
   Logically groups objects together. Used as a way of passing
 	objects around without having to perform unions on them.

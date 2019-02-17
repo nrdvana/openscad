@@ -47,6 +47,7 @@ public: // types
 		LET,
 		INT_FOR,
 		EXTR_FOR,
+		EXTR_SHAPE,
 		IF
     };
 public: // methods
@@ -331,6 +332,15 @@ AbstractNode *ControlModule::instantiate(const Context* ctx, const ModuleInstant
 		for_eval(*node, *inst, 0, evalctx, evalctx);
 		break;
 
+	case Type::EXTR_SHAPE:{
+		node = new ExtrusionShapeNode(inst);
+
+		Context c(evalctx);
+		inst->scope.apply(c);
+		node->children = inst->instantiateChildren(&c);
+	}
+		break;
+
 	case Type::IF: {
 		node = new GroupNode(inst);
 		const IfElseModuleInstantiation *ifelse = dynamic_cast<const IfElseModuleInstantiation*>(inst);
@@ -361,5 +371,6 @@ void register_builtin_control()
 	Builtins::init("let", new ControlModule(ControlModule::Type::LET));
 	Builtins::init("intersection_for", new ControlModule(ControlModule::Type::INT_FOR));
 	Builtins::init("extrude_for", new ControlModule(ControlModule::Type::EXTR_FOR));
+	Builtins::init("extrusion_shape", new ControlModule(ControlModule::Type::EXTR_SHAPE));
 	Builtins::init("if", new ControlModule(ControlModule::Type::IF));
 }

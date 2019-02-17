@@ -104,6 +104,11 @@ GeometryEvaluator::ResultObject GeometryEvaluator::applyToChildren(const Abstrac
 				PRINTB("WARNING: Mixing 2D and 3D objects is not supported, %s", loc);
 				break;
 			}
+			else if (dim == 23) {
+				std::string loc = item.first->modinst->location().toRelativeString(this->tree.getDocumentPath());
+				PRINTB("WARNING: Cannot combine multiple extrusion_shape in the same extrude_for, %s", loc);
+				break;
+			}
 		}
 	}
     if (dim == 2) {
@@ -112,6 +117,11 @@ GeometryEvaluator::ResultObject GeometryEvaluator::applyToChildren(const Abstrac
         return ResultObject(p2d);
     }
     else if (dim == 3) return applyToChildren3D(node, op);
+	else if (dim == 23) {
+		for(auto &item : this->visitedchildren[node.index()])
+			if (!item.first->modinst->isBackground() && item.second)
+				return ResultObject(item.second);
+	}
 	return ResultObject();
 }
 
@@ -632,6 +642,20 @@ Response GeometryEvaluator::visit(State &state, const TransformNode &node)
 							geom = newN;
 						}
 					}
+					else if (geom->getDimension() == 23) { // 2D transformed in 3D
+						shared_ptr<const Polygon2dIn3d> polygons= dynamic_pointer_cast<const Polygon2dIn3d>(geom);
+						assert(polygons);
+						// clone if const
+						shared_ptr<Polygon2dIn3d> newpoly;
+						if (res.isConst()) newpoly.reset(new Polygon2dIn3d(*polygons));
+						else newpoly = dynamic_pointer_cast<Polygon2dIn3d>(res.ptr());
+
+						newpoly->matrix = newpoly->matrix * node.matrix;
+						geom = newpoly;
+					}
+					else {
+						PRINTB("WARNING: Can't translate geometry of type %s", typeid(*(geom.get())).name());
+					}
 				}
 			}
 		}
@@ -956,55 +980,37 @@ Response GeometryEvaluator::visit(State &state, const RotateExtrudeNode &node)
 	return Response::ContinueTraversal;
 }
 
-void diag(const AbstractNode &node, int indent) {
-	printf("%*s node %d\n", indent, "", node.index());
-	std::cerr << node;
-	printf("%*s children = %d\n", indent, "", node.children.size());
-	for (const AbstractNode *chnode : node.children) {
-		diag(*chnode, indent+2);
-	}
-}
-
-bool GeometryEvaluator::collect2DPolygonsIn3D(const AbstractNode *node, std::vector<Polygon2DIn3D> *result)
+Response GeometryEvaluator::visit(State &state, const ExtrusionShapeNode &node)
 {
-	// Find the matrix.
-	// Recursively descend the nodes until it has more than 1 child, multiplying the matrix along the way
-	const TransformNode *t= NULL, *begin_2d= NULL;
-	Transform3d mat;
-	while (1) {
-		if ((t= dynamic_cast<const TransformNode*>(node))) {
-			begin_2d= t;
-			mat= mat * t->matrix;
+	if (state.isPrefix() && isSmartCached(node)) return Response::PruneTraversal;
+	if (state.isPostfix()) {
+		shared_ptr<const Geometry> geom;
+		if (!isSmartCached(node)) {
+			Polygon2d *poly= applyToChildren2D(node, OpenSCADOperator::UNION);
+			if (!poly) {
+				PRINTB("Error: %s must contain 2D geometry", node.name().c_str());
+				return Response::AbortTraversal;
+			}
+			geom.reset(new Polygon2dIn3d(*poly));
+			delete poly;
 		}
-		if (node->children.size() == 1)
-			node= node->children[0];
-		else
-			break;
+		else {
+			geom = smartCacheGet(node, false);
+		}
+		addToParent(state, node, geom);
+		node.progress_report();
 	}
-	// If there wasn't a transform node, we can't extrude
-	if (!begin_2d) {
-		PRINTB("Error: extrude_for must contain at least one transform (with no siblings) before any geometry specification%s", "");
-		return false;
-	}
-	// Find the 2D polygon of the children of the final transform node.
-	Polygon2d *poly= applyToChildren2D(*begin_2d, OpenSCADOperator::UNION);
-	if (!poly) {
-		PRINTB("Error: no 2D geometry found under %s within extrude_for", begin_2d->name().c_str());
-		return false;
-	}
-	// make sure no point on this polygon crosses the previous plane
-	
-	// make sure no point on the previous polygon crosses this plane
-	
-	// Add polygon and matrix to the list
-	result->push_back(Polygon2DIn3D(poly, mat));
-	return true;
+	return Response::ContinueTraversal;
 }
 
-shared_ptr<const Geometry> GeometryEvaluator::extrudePolygonSequence(const ExtrudeForNode &node, const std::vector<Polygon2DIn3D> &slices)
+shared_ptr<const Geometry> GeometryEvaluator::extrudePolygonSequence(const ExtrudeForNode &node, const std::vector<const class Polygon2dIn3d *> &slices)
 {
-	(void) node;
-	(void) slices;
+	printf("extrudePolygonSequence(%s(%p), [\n", node.name().c_str(), &node);
+	for (auto slice : slices) {
+		printf("   %s,\n", slice->dump().c_str());
+	}
+	printf("]\n");
+	
 	return nullptr;
 }
 
@@ -1014,13 +1020,20 @@ Response GeometryEvaluator::visit(State &state, const ExtrudeForNode &node)
 	if (state.isPostfix()) {
 		shared_ptr<const Geometry> geom(nullptr);
 		if (!isSmartCached(node)) {
-			diag(node, 0);
-			std::vector<Polygon2DIn3D> slices;
-			bool success= true;
-			for (auto chnode= node.children.begin(); chnode < node.children.end(); ++chnode)
-				success = success && collect2DPolygonsIn3D(*chnode, &slices);
-			if (success)
-				geom= extrudePolygonSequence(node, slices);
+			std::vector<const Polygon2dIn3d *> slices;
+			for(const auto &item : this->visitedchildren[node.index()]) {
+				const AbstractNode *chnode = item.first;
+				const shared_ptr<const Geometry> &chgeom = item.second;
+				if (chnode->modinst->isBackground() || !chgeom) continue;
+				const Polygon2dIn3d* p2d3d= dynamic_cast<const Polygon2dIn3d*>(chgeom.get());
+				if (p2d3d)
+					slices.push_back(p2d3d);
+				else {
+					std::string loc = item.first->modinst->location().toRelativeString(this->tree.getDocumentPath());
+					PRINTB("WARNING: Ignoring non-extrusion_shape within extrude_for, %s ", loc);
+				}
+			}
+			geom= extrudePolygonSequence(node, slices);
 		}
 		else {
 			geom = smartCacheGet(node, false);

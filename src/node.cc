@@ -54,6 +54,11 @@ std::string ExtrudeForNode::name() const
 	return "extrude_for";
 }
 
+std::string ExtrusionShapeNode::name() const
+{
+	return "extrusion_shape";
+}
+
 std::string GroupNode::name() const
 {
 	return "group";

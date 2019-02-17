@@ -112,3 +112,37 @@ bool Polygon2d::is_convex() const
 	return true;
 }
 
+size_t Polygon2dIn3d::memsize() const
+{
+	size_t mem = 0;
+	for (const auto &o : this->outlines()) {
+		mem += o.vertices.size() * sizeof(Vector2d) + sizeof(Outline2d);
+	}
+	mem += sizeof(Polygon2dIn3d);
+	return mem;
+}
+
+std::string Polygon2dIn3d::dump() const
+{
+	std::ostringstream out;
+	for (const auto &o : this->outlines()) {
+		out << "contour:\n";
+		for (const auto &v : o.vertices) {
+			out << "  " << v.transpose();
+		}
+		out << "\n";
+	}
+	out << "multmatrix([";
+	for (int j=0;j<4;j++) {
+		out << "[";
+		for (int i=0;i<4;i++) {
+			double v(this->matrix(j, i));
+			out << v;
+			if (i != 3) out << ", ";
+		}
+		out << "]";
+		if (j != 3) out << ", ";
+	}
+	out << "])\n";
+	return out.str();
+}

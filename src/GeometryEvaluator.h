@@ -24,6 +24,7 @@ public:
 	Response visit(State &state, const AbstractPolyNode &node) override;
 	Response visit(State &state, const LinearExtrudeNode &node) override;
 	Response visit(State &state, const RotateExtrudeNode &node) override;
+	Response visit(State &state, const ExtrusionShapeNode &node) override;
 	Response visit(State &state, const ExtrudeForNode &node) override;
 	Response visit(State &state, const GroupNode &node) override;
 	Response visit(State &state, const RootNode &node) override;
@@ -57,12 +58,6 @@ private:
 		shared_ptr<const Geometry> const_pointer;
 	};
 	
-	struct Polygon2DIn3D {
-		std::unique_ptr<const Polygon2d> polygon;
-		Transform3d matrix;
-		Polygon2DIn3D(const Polygon2d *p, const Transform3d &m): polygon(p), matrix(m) {}
-	};
-
 	void smartCacheInsert(const AbstractNode &node, const shared_ptr<const Geometry> &geom);
 	shared_ptr<const Geometry> smartCacheGet(const AbstractNode &node, bool preferNef);
 	bool isSmartCached(const AbstractNode &node);
@@ -73,8 +68,7 @@ private:
 	Geometry *applyHull3D(const AbstractNode &node);
 	void applyResize3D(class CGAL_Nef_polyhedron &N, const Vector3d &newsize, const Eigen::Matrix<bool,3,1> &autosize);
 	Polygon2d *applyToChildren2D(const AbstractNode &node, OpenSCADOperator op);
-	bool collect2DPolygonsIn3D(const AbstractNode *node, std::vector<Polygon2DIn3D> *result);
-	shared_ptr<const Geometry> extrudePolygonSequence(const ExtrudeForNode &node, const std::vector<Polygon2DIn3D> &slices);
+	shared_ptr<const Geometry> extrudePolygonSequence(const ExtrudeForNode &node, const std::vector<const class Polygon2dIn3d *> &slices);
 	ResultObject applyToChildren3D(const AbstractNode &node, OpenSCADOperator op);
 	ResultObject applyToChildren(const AbstractNode &node, OpenSCADOperator op);
 	void addToParent(const State &state, const AbstractNode &node, const shared_ptr<const Geometry> &geom);
