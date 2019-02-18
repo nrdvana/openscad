@@ -196,4 +196,10 @@ void Polygon2d::applyTrans3d(Polygon2d::Outlines2d &outlines) const {
 			v = t * v;
 		}
 	}
+	// A 2D transformation may flip the winding order of a polygon.
+	// If that happens with a sanitized polygon, we need to reverse
+	// the winding order for it to be correct.
+	if (sanitized && t.matrix().determinant() <= 0)
+		for (auto &o : outlines)
+			std::reverse(o.vertices.begin(), o.vertices.end());
 }
