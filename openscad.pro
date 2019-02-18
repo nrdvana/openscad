@@ -308,6 +308,7 @@ HEADERS += src/version_check.h \
            src/node.h \
            src/csgnode.h \
            src/offsetnode.h \
+           src/extrudenode.h \
            src/linearextrudenode.h \
            src/rotateextrudenode.h \
            src/projectionnode.h \
@@ -449,6 +450,7 @@ SOURCES += \
            src/dxfdata.cc \
            src/dxfdim.cc \
            src/offset.cc \
+           src/extrude.cc \
            src/linearextrude.cc \
            src/rotateextrude.cc \
            src/printutils.cc \

@@ -40,8 +40,9 @@ public:
 	void transform(const Transform2d &mat);
 	void transform3d(const Transform3d &mat);
 	bool hasTransform3d() { return trans3dState != Transform3dState::NONE; }
-	const Transform3d &getTransform3d() {
-		if (trans3dState == Transform3dState::NONE) trans3d= Transform3d::Identity();
+	const Transform3d &getTransform3d() const {
+		// lazy initialization doesn't actually violate 'const'
+		if (trans3dState == Transform3dState::NONE) const_cast<Transform3d&>(trans3d)= Transform3d::Identity();
 		return trans3d;
 	}
 	void resize(const Vector2d &newsize, const Eigen::Matrix<bool,2,1> &autosize);
