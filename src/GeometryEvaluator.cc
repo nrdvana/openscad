@@ -387,7 +387,7 @@ void GeometryEvaluator::addToParent(const State &state,
 }
 
 /*!
-   Custom nodes are handled here => implicit union
+   Custom nodes are handled here => maybe implicit union
 */
 Response GeometryEvaluator::visit(State &state, const AbstractNode &node)
 {
@@ -396,14 +396,24 @@ Response GeometryEvaluator::visit(State &state, const AbstractNode &node)
 		state.setPreferNef(true); // Improve quality of CSG by avoiding conversion loss
 	}
 	if (state.isPostfix()) {
-		shared_ptr<const class Geometry> geom;
-		if (!isSmartCached(node)) {
-			geom = applyToChildren(node, OpenSCADOperator::UNION).constptr();
+		if (node.autoUnion || !state.parent()) {
+			shared_ptr<const class Geometry> geom;
+			if (!isSmartCached(node)) {
+				geom = applyToChildren(node, OpenSCADOperator::UNION).constptr();
+			}
+			else {
+				geom = smartCacheGet(node, state.preferNef());
+			}
+			addToParent(state, node, geom);
+		} else {
+			auto &dest= this->visitedchildren[state.parent()->index()];
+			auto &src=  this->visitedchildren[node.index()];
+			int n= (int) src.size();
+			std::move(src.begin(), src.end(), dest.end());
+			printf("node %s(%p) is !autoUnion, passes %d children to parent %s(%p)\n",
+				node.name().c_str(), &node, n, state.parent()->name().c_str(), state.parent());
+			this->visitedchildren.erase(node.index());
 		}
-		else {
-			geom = smartCacheGet(node, state.preferNef());
-		}
-		addToParent(state, node, geom);
 		node.progress_report();
 	}
 	return Response::ContinueTraversal;

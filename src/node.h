@@ -49,6 +49,7 @@ public:
 	// progress_mark is a running number used for progress indication
 	// FIXME: Make all progress handling external, put it in the traverser class?
 	int progress_mark;
+	bool autoUnion;
 	void progress_prepare();
 	void progress_report() const;
 

@@ -74,7 +74,12 @@ void ControlModule::for_eval(AbstractNode &node, const ModuleInstantiation &inst
 		const std::string &it_name = evalctx->getArgName(l);
 		ValuePtr it_values = evalctx->getArgValue(l, ctx);
 		Context c(ctx);
-		if (it_values->type() == Value::ValueType::RANGE) {
+		// Special case, if there are  > 1 arguments and this one is "union=" then it indicates the autoUnion flag
+		if (l > 1 && it_name == "union") {
+			node.autoUnion= it_values->toBool();
+			for_eval(node, inst, l+1, &c, evalctx);
+		}
+		else if (it_values->type() == Value::ValueType::RANGE) {
 			RangeType range = it_values->toRange();
 			uint32_t steps = range.numValues();
 			if (steps >= 10000) {
